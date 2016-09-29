@@ -858,13 +858,21 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider, Wa
         long sessionId = connReq.getSessionId();
         if (sessionId == 0) {
             LOG.info("Client attempting to establish new session at "
-                    + cnxn.getRemoteSocketAddress());
+                    + cnxn.getRemoteSocketAddress()
+                    + "; client last zxid is 0x"
+                    + Long.toHexString(connReq.getLastZxidSeen())
+                    + "; server last zxid is 0x"
+                    + Long.toHexString(getZKDatabase().getDataTreeLastProcessedZxid()));
             createSession(cnxn, passwd, sessionTimeout);
         } else {
             long clientSessionId = connReq.getSessionId();
             LOG.info("Client attempting to renew session 0x"
                     + Long.toHexString(clientSessionId)
-                    + " at " + cnxn.getRemoteSocketAddress());
+                    + " at " + cnxn.getRemoteSocketAddress()
+                    + "; client last zxid is 0x"
+                    + Long.toHexString(connReq.getLastZxidSeen())
+                    + "; server last zxid is 0x"
+                    + Long.toHexString(getZKDatabase().getDataTreeLastProcessedZxid()));
             serverCnxnFactory.closeSession(sessionId);
             cnxn.setSessionId(sessionId);
             reopenSession(cnxn, sessionId, passwd, sessionTimeout);

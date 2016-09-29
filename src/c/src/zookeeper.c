@@ -1881,6 +1881,10 @@ static int prime_connection(zhandle_t *zh)
     req.timeOut = zh->recv_timeout;
     req.lastZxidSeen = zh->last_zxid;
     hlen = htonl(len);
+
+    LOG_INFO(LOGCALLBACK(zh), "Priming connection to [%s]: last_zxid=0x%x", 
+            format_endpoint_info(&zh->addr_cur), zh->last_zxid);
+
     /* We are running fast and loose here, but this string should fit in the initial buffer! */
     rc=zookeeper_send(zh->fd, &hlen, sizeof(len));
     serialize_prime_connect(&req, buffer_req);
@@ -2738,6 +2742,10 @@ int zookeeper_process(zhandle_t *zh, int events)
             }
 
             if (hdr.xid != PING_XID && hdr.zxid > 0) {
+                if (hdr.zxid < zh->last_zxid) {
+                    LOG_ERROR(LOGCALLBACK(zh), "zxid from response went backwards! hdr.zxid=0x%x last_zxid=0x%x",
+                             hdr.zxid, zh->last_zxid);
+                }
                 // Update last_zxid only when it is a request response
                 zh->last_zxid = hdr.zxid;
             }
