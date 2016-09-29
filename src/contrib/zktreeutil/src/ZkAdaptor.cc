@@ -201,7 +201,7 @@ namespace zktreeutil
                     << std::endl; 
                 return;
             }
-            else if ( state && state != ZOO_CONNECTING_STATE)
+            else if ( state && state != 999 && state != ZOO_CONNECTING_STATE)
             {
                 // Not connecting any more... some other issue
                 std::ostringstream oss;
