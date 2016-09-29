@@ -40,6 +40,7 @@ import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.Quotas;
+import org.apache.zookeeper.Sessions;
 import org.apache.zookeeper.StatsTrack;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
@@ -62,6 +63,8 @@ import org.apache.zookeeper.txn.SetACLTxn;
 import org.apache.zookeeper.txn.SetDataTxn;
 import org.apache.zookeeper.txn.Txn;
 import org.apache.zookeeper.txn.TxnHeader;
+import org.apache.zookeeper.ZooDefs.Perms;
+import org.apache.zookeeper.ZooDefs.Ids;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,11 +100,21 @@ public class DataTree {
     /** this will be the string thats stored as a child of root */
     private static final String procChildZookeeper = procZookeeper.substring(1);
 
+	/**
+     * the zookeeper session node that acts as the session management node for
+     * zookeeper
+     */
+    private static final String sessionZookeeper = Sessions.sessionsZookeeper;
+
     /**
      * the zookeeper quota node that acts as the quota management node for
      * zookeeper
      */
     private static final String quotaZookeeper = Quotas.quotaZookeeper;
+
+    /** the child node of procZookeeper for holding sessions */
+    private static final String sessionChildZookeeper = sessionZookeeper
+            .substring(procZookeeper.length() + 1);
 
     /** this will be the string thats stored as a child of /zookeeper */
     private static final String quotaChildZookeeper = quotaZookeeper
@@ -259,6 +272,11 @@ public class DataTree {
      */
     private final DataNode procDataNode = new DataNode(new byte[0], -1L, new StatPersisted());
 
+	/**
+     * create a /zookeeper/sessions node for recording and manipulating sessions
+     */
+    private DataNode sessionDataNode = new DataNode(new byte[0], -1L, new StatPersisted());
+
     /**
      * create a /zookeeper/quota node for maintaining quota properties for
      * zookeeper
@@ -280,6 +298,9 @@ public class DataTree {
         /** add the proc node and quota node */
         root.addChild(procChildZookeeper);
         nodes.put(procZookeeper, procDataNode);
+
+        procDataNode.addChild(sessionChildZookeeper);
+        nodes.put(sessionZookeeper, sessionDataNode);
 
         procDataNode.addChild(quotaChildZookeeper);
         nodes.put(quotaZookeeper, quotaDataNode);
@@ -799,6 +820,13 @@ public class DataTree {
             rc.err = 0;
             rc.multiResult = null;
             switch (header.getType()) {
+                case OpCode.createSession:
+                    createNode(Sessions.getSessionZKPath(header.getClientId()), 
+                            new byte[0], 
+                            Ids.OPEN_ACL_UNSAFE,
+                            0, -1,
+                            header.getZxid(), header.getTime());
+                    break;
                 case OpCode.create:
                     CreateTxn createTxn = (CreateTxn) txn;
                     rc.path = createTxn.getPath();
@@ -843,6 +871,11 @@ public class DataTree {
                             setACLTxn.getVersion());
                     break;
                 case OpCode.closeSession:
+                    try {
+                        deleteNode(Sessions.getSessionZKPath(header.getClientId()), header.getZxid());
+                    } catch(NoNodeException ex) {
+                        LOG.warn("trying to delete a non-existing session node");
+                    }
                     killSession(header.getClientId(), header.getZxid());
                     break;
                 case OpCode.error:

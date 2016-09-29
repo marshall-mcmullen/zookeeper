@@ -39,6 +39,12 @@ import org.apache.jute.BinaryInputArchive;
 import org.apache.jute.BinaryOutputArchive;
 import org.apache.jute.Record;
 import org.apache.zookeeper.Environment;
+import org.apache.zookeeper.Sessions;
+import org.apache.zookeeper.KeeperException.NoNodeException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.Stat;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.KeeperException.SessionExpiredException;
@@ -74,7 +80,7 @@ import org.slf4j.LoggerFactory;
  * following chain of RequestProcessors to process requests:
  * PrepRequestProcessor -> SyncRequestProcessor -> FinalRequestProcessor
  */
-public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
+public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider, Watcher {
     protected static final Logger LOG;
 
     static {
@@ -1006,6 +1012,14 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             if (hdr != null && txn instanceof CreateSessionTxn) {
                 CreateSessionTxn cst = (CreateSessionTxn) txn;
                 sessionTracker.addGlobalSession(sessionId, cst.getTimeOut());
+                try {
+                    Stat stat = new Stat();
+                    String sessionZKPath = Sessions.getSessionZKPath(sessionId);
+                    getZKDatabase().getData(sessionZKPath, stat, this);
+                } catch(NoNodeException ex)
+                {
+                    LOG.warn("Attempting to set a watch on a session zknode that doesnt exist!");
+                }
             } else if (request != null && request.isLocalSession()) {
                 request.request.rewind();
                 int timeout = request.request.getInt();
@@ -1022,4 +1036,15 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         return rc;
     }
 
+    /** 
+	 * Callback watcher used to listen for changes to the /sessions directory
+	 */
+    public void process(WatchedEvent evt) {
+        // only close the session if it was a node changed event on the sessions node
+       if(evt.getPath().startsWith(Sessions.sessionsZookeeper) && 
+			   evt.getType() == Watcher.Event.EventType.NodeDataChanged) {
+		   long sessionId = Sessions.getSessionIdFromSessionZKPath(evt.getPath());
+		   close(sessionId);
+		}
+	}
 }
