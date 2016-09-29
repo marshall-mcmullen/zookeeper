@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.zookeeper.common.Time;
 import org.apache.zookeeper.jmx.MBeanRegistry;
 import org.apache.zookeeper.server.quorum.QuorumCnxManager.Message;
 import org.apache.zookeeper.server.quorum.QuorumPeer.LearnerType;
@@ -786,7 +787,7 @@ public class FastLeaderElection implements Election {
             self.jmxLeaderElectionBean = null;
         }
         if (self.start_fle == 0) {
-           self.start_fle = System.currentTimeMillis();
+           self.start_fle = Time.currentElapsedTime();
         }
         try {
             HashMap<Long, Vote> recvset = new HashMap<Long, Vote>();

@@ -38,6 +38,7 @@ import javax.security.sasl.SaslException;
 import org.apache.jute.BinaryInputArchive;
 import org.apache.jute.BinaryOutputArchive;
 import org.apache.jute.Record;
+import org.apache.zookeeper.common.Time;
 import org.apache.zookeeper.Environment;
 import org.apache.zookeeper.Sessions;
 import org.apache.zookeeper.KeeperException.NoNodeException;
@@ -306,7 +307,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider, Wa
     }
 
     long getTime() {
-        return System.currentTimeMillis();
+        return Time.currentElapsedTime();
     }
 
     private void close(long sessionId) {

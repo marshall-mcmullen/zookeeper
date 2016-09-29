@@ -16,29 +16,16 @@
  * limitations under the License.
  */
 
-#include "Util.h"
+package org.apache.zookeeper.common;
 
-const std::string EMPTY_STRING;
-
-TestConfig globalTestConfig;
-
-void millisleep(int ms){
-    timespec ts;
-    ts.tv_sec=ms/1000;
-    ts.tv_nsec=(ms%1000)*1000000; // to nanoseconds
-    nanosleep(&ts,0);
-    public interface Operation<T> {
-        public T execute() throws Exception;
-    }
-
-    public static <T> T profile(Operation<T> op, long timeout, String message)
-            throws Exception {
-        long start = Time.currentElapsedTime();
-        T res = op.execute();
-        long end = Time.currentElapsedTime();
-        if (end - start > timeout) {
-            LOG.info("Elapsed "+(end - start) + " ms: " + message);
-        }
-        return res;
+public class Time {
+    /**
+     * Returns time in milliseconds as does System.currentTimeMillis(), but uses elapsed time from an arbitrary epoch
+     * more like System.nanoTime().  The difference is that if somebody changes the system clock, Time.currentElapsedTime
+     * will change but nanoTime won't.  On the other hand, all of ZK assumes that time is measured in milliseconds.
+     * @return  The time in milliseconds from some arbitrary point in time.
+     */
+    public static long currentElapsedTime() {
+        return System.nanoTime() / 1000000;
     }
 }
