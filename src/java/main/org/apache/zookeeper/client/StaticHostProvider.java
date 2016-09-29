@@ -114,7 +114,7 @@ public final class StaticHostProvider implements HostProvider {
         for (InetSocketAddress address : serverAddresses) {
             InetAddress ia = address.getAddress();
             InetAddress resolvedAddresses[] = InetAddress.getAllByName((ia!=null) ? ia.getHostAddress():
-                    address.getHostName());
+                    address.getHostString());
             for (InetAddress resolvedAddress : resolvedAddresses) {
                 // If hostName is null but the address is not, we can tell that
                 // the hostName is an literal IP address. Then we can set the host string as the hostname
@@ -171,7 +171,7 @@ public final class StaticHostProvider implements HostProvider {
             if (addr.getPort() == currentHost.getPort() &&
                     ((addr.getAddress()!=null && currentHost.getAddress()!=null &&
                       addr.getAddress().equals(currentHost.getAddress()))
-                     || addr.getHostName().equals(currentHost.getHostName()))) {
+                     || addr.toString().equals(currentHost.toString()))) {
                    myServerInNewConfig = true;
                    break;
                }

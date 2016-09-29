@@ -220,7 +220,7 @@ public class QuorumPeer extends Thread implements QuorumStats.Provider {
             StringWriter sw = new StringWriter();            
             //addr should never be null, but just to make sure
             if (addr !=null) { 
-                sw.append(addr.getHostName());
+                sw.append(addr.getHostString());
                 sw.append(":");
                 sw.append(String.valueOf(addr.getPort()));
             }
@@ -232,7 +232,7 @@ public class QuorumPeer extends Thread implements QuorumStats.Provider {
             else if (type == LearnerType.PARTICIPANT) sw.append(":participant");            
             if (clientAddr!=null){
                 sw.append(";");
-                sw.append(clientAddr.getHostName() + ":" + String.valueOf(clientAddr.getPort()));
+                sw.append(clientAddr.getHostString() + ":" + String.valueOf(clientAddr.getPort()));
             }
             return sw.toString();       
         }

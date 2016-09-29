@@ -39,7 +39,7 @@ public class RemotePeerBean implements RemotePeerMXBean,ZKMBeanInfo {
     }
 
     public String getQuorumAddress() {
-        return peer.addr.getHostName()+":"+peer.addr.getPort();
+        return peer.addr.getHostString()+":"+peer.addr.getPort();
     }
 
 }
