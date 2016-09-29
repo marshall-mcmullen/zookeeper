@@ -1939,6 +1939,19 @@ ZOOAPI int zoo_wget_children2(zhandle_t *zh, const char *path,
         struct String_vector *strings, struct Stat *stat);
 
 /**
+ * \brief Flush leader channel.
+ *
+ * \param zh the zookeeper handle obtained by a call to \ref zookeeper_init
+ * \param path the name of the node. Expressed as a file name with slashes
+ * separating ancestors of the node.
+ * \return ZOK on success or one of the following errcodes on failure:
+ * ZBADARGUMENTS - invalid input parameters
+ * ZINVALIDSTATE - zhandle state is either ZOO_SESSION_EXPIRED_STATE or ZOO_AUTH_FAILED_STATE
+ * ZMARSHALLINGERROR - failed to marshall a request; possibly, out of memory
+ */
+ZOOAPI int zoo_sync(zhandle_t *zh, const char *path);
+
+/**
  * \brief gets the acl associated with a node synchronously.
  *
  * \param zh the zookeeper handle obtained by a call to \ref zookeeper_init

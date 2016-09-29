@@ -4328,6 +4328,23 @@ int zoo_wget_children2(zhandle_t *zh, const char *path,
     return zoo_wget_children2_(zh,path,watcher,watcherCtx,strings,stat);
 }
 
+int zoo_sync(zhandle_t *zh, const char *path)
+{
+    struct sync_completion *sc = alloc_sync_completion();
+    int rc;
+    if (!sc) {
+        return ZSYSTEMERROR;
+    }
+    rc = zoo_async(zh, path, SYNCHRONOUS_MARKER, sc);
+    if (rc == ZOK) {
+        wait_sync_completion(sc);
+        rc = sc->rc;
+    }
+    free_sync_completion(sc);
+
+    return rc;
+}
+
 int zoo_get_acl(zhandle_t *zh, const char *path, struct ACL_vector *acl,
         struct Stat *stat)
 {
