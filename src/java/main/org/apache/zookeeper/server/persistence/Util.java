@@ -235,9 +235,23 @@ public class Util {
             // empty transaction
             if (bytes.length == 0)
                 return bytes;
-            if (ia.readByte("EOF") != 'B') {
-                LOG.error("Last transaction was partial.");
-                return null;
+            
+            /*
+             * A sentinel byte of 0x42 (aka 'B') is put at the end of every archive record
+             * by writeTxnBytes. If the byte is not 0x42 then the record is corrupt. If the
+             * sentinel is zero then this is most likely the result of a partially complete
+             * file flush and we are reading a preformat byte. So we treat 0 like an end of
+             * file. If it is anything else then it must be some external corruption and we
+             * throw an error.
+             */
+            byte sentinel = ia.readByte("EOR");
+            if (sentinel != 'B') {
+                if (sentinel == 0) {
+                    LOG.error("Last transaction was partial.");
+                    return null;
+                }
+                // must be external corruption (CRCTest expects this error msg exactly)
+                throw new IOException("Corrupt Sentinel byte");
             }
             return bytes;
         }catch(EOFException e){}
@@ -275,6 +289,7 @@ public class Util {
     public static void writeTxnBytes(OutputArchive oa, byte[] bytes)
             throws IOException {
         oa.writeBuffer(bytes, "txnEntry");
+        // write a sentinel byte used for detecting partial records in readTxnBytes
         oa.writeByte((byte) 0x42, "EOR"); // 'B'
     }
     

@@ -673,6 +673,23 @@ public class FileTxnLog implements TxnLog {
             }
             return true;
         }
+        
+        /**
+         * Get the current position for the next record to read within the current log file.
+         * @return Byte offset to the beginning of the next record
+         */
+        public long getPosition() {
+            return inputStream.getPosition();
+        }
+        
+        /**
+         * Get the pathname of the log file currently being read. It may be null
+         * if no records have been read yet.
+         * @return Pathname of current log file
+         */
+        public File getFile() {
+            return logFile;
+        }
 
         /**
          * reutrn the current header
@@ -693,11 +710,12 @@ public class FileTxnLog implements TxnLog {
         }
 
         /**
-         * close the iterator
-         * and release the resources.
+         * close the iterator and release the resources.
+         * there is nothing to do if at end of stream
          */
         public void close() throws IOException {
-            inputStream.close();
+            if (inputStream != null)
+                inputStream.close();
         }
     }
 
