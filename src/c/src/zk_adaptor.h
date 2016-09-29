@@ -249,6 +249,9 @@ struct _zhandle {
 
     /** used for chroot path at the client side **/
     char *chroot;
+
+    // Local IP Address to bind all outgoing communication to
+    char *local_ip;
 };
 
 

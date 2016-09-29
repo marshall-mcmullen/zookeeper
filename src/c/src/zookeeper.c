@@ -451,6 +451,11 @@ static void destroy(zhandle_t *zh)
         zh->chroot = NULL;
     }
 
+    if (zh->local_ip != NULL) {
+        free(zh->local_ip);
+        zh->local_ip = NULL;
+    }
+
     free_auth_info(&zh->auth_h);
     destroy_zk_hashtable(zh->active_node_watchers);
     destroy_zk_hashtable(zh->active_exist_watchers);
@@ -997,7 +1002,7 @@ static void log_env(zhandle_t *zh) {
  */
 static zhandle_t *zookeeper_init_internal(const char *host, watcher_fn watcher,
         int recv_timeout, const clientid_t *clientid, void *context, int flags,
-        log_callback_fn log_callback)
+        log_callback_fn log_callback, const char *local_ip)
 {
     int errnosave = 0;
     zhandle_t *zh = NULL;
@@ -1020,7 +1025,7 @@ static zhandle_t *zookeeper_init_internal(const char *host, watcher_fn watcher,
     }
 #endif
     LOG_INFO(LOGCALLBACK(zh), "Initiating client connection, host=%s sessionTimeout=%d watcher=%p"
-          " sessionId=%#llx sessionPasswd=%s context=%p flags=%d",
+          " sessionId=%#llx sessionPasswd=%s context=%p flags=%d localIP=%s",
               host,
               recv_timeout,
               watcher,
@@ -1028,7 +1033,8 @@ static zhandle_t *zookeeper_init_internal(const char *host, watcher_fn watcher,
               ((clientid == 0) || (clientid->passwd[0] == 0) ?
                "<null>" : "<hidden>"),
               context,
-              flags);
+              flags,
+              local_ip);
 
     zh->hostname = NULL;
     zh->fd = -1;
@@ -1077,6 +1083,12 @@ static zhandle_t *zookeeper_init_internal(const char *host, watcher_fn watcher,
     if(update_addrs(zh) != 0) {
         goto abort;
     }
+    if (local_ip) {
+        zh->local_ip = strdup(local_ip);
+        if (zh->local_ip == NULL) {
+            goto abort;
+        }
+    }
     if (clientid) {
         memcpy(&zh->client_id, clientid, sizeof(zh->client_id));
     } else {
@@ -1109,14 +1121,21 @@ abort:
 zhandle_t *zookeeper_init(const char *host, watcher_fn watcher,
         int recv_timeout, const clientid_t *clientid, void *context, int flags)
 {
-    return zookeeper_init_internal(host, watcher, recv_timeout, clientid, context, flags, NULL);
+    return zookeeper_init_internal(host, watcher, recv_timeout, clientid, context, flags, NULL, NULL);
 }
 
 zhandle_t *zookeeper_init2(const char *host, watcher_fn watcher,
         int recv_timeout, const clientid_t *clientid, void *context, int flags,
         log_callback_fn log_callback)
 {
-    return zookeeper_init_internal(host, watcher, recv_timeout, clientid, context, flags, log_callback);
+    return zookeeper_init_internal(host, watcher, recv_timeout, clientid, context, flags, log_callback, NULL);
+}
+
+zhandle_t *zookeeper_init3(const char *host, watcher_fn watcher,
+        int recv_timeout, const clientid_t *clientid, void *context, int flags,
+        log_callback_fn log_callback, const char *local_ip)
+{
+    return zookeeper_init_internal(host, watcher, recv_timeout, clientid, context, flags, log_callback, local_ip);
 }
 
 /**
@@ -2007,6 +2026,23 @@ int zookeeper_interest(zhandle_t *zh, int *fd, int *interest,
 #else
             fcntl(zh->fd, F_SETFL, O_NONBLOCK|fcntl(zh->fd, F_GETFL, 0));
 #endif
+
+            // If requested explicitly bind outgoing socket to specified IPAddress
+            if (zh->local_ip) {
+                struct sockaddr_in laddr;
+                memset(&laddr, 0, sizeof(laddr));
+                laddr.sin_addr.s_addr = inet_addr(zh->local_ip);
+                laddr.sin_family = AF_INET;
+                // ***DO NOT SET laddr.sin_port.*** If it is set to anything when we bind(), prior to the connect,
+                // things will just not work one bit.  So don't do it. The memset() above ensures it's zero'd out.
+                rc = bind(zh->fd, (struct sockaddr *)&laddr, sizeof(laddr));
+
+                if (rc != 0) {
+                    return api_epilog(zh, handle_socket_error_msg(zh, __LINE__,
+                                                                  ZSYSTEMERROR, "bind() to local ip failed"));
+                }
+            }
+
 #if defined(AF_INET6)
             if (zh->addr_cur.ss_family == AF_INET6) {
                 rc = connect(zh->fd, (struct sockaddr*)&zh->addr_cur, sizeof(struct sockaddr_in6));
