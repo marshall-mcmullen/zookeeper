@@ -24,6 +24,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 
@@ -72,6 +73,64 @@ public class LearnerTest extends ZKTestCase {
         for (File child : dir.listFiles()) {
             recursiveDelete(child);
         }
+    }
+
+    static class TimeoutLearner extends Learner {
+        int passSocketConnectOnAttempt = 10;
+        int socketConnectAttempt = 0;
+        long timeMultiplier = 0;
+
+        public void setTimeMultiplier(long multiplier) {
+            timeMultiplier = multiplier;
+        }
+
+        public void setPassConnectAttempt(int num) {
+            passSocketConnectOnAttempt = num;
+        }
+
+        protected long nanoTime() {
+            return socketConnectAttempt * timeMultiplier;
+        }
+
+        protected void sockConnect(Socket sock, InetSocketAddress addr, int timeout) 
+        throws IOException {
+            if (++socketConnectAttempt < passSocketConnectOnAttempt)    {
+                throw new IOException("Test injected Socket.connect() error.");
+            }
+        }
+    }
+
+    @Test(expected=IOException.class)
+    public void connectionRetryTimeoutTest() throws Exception {
+        Learner learner = new TimeoutLearner();
+        learner.self = new QuorumPeer();
+        learner.self.setTickTime(2000);
+        learner.self.setInitLimit(5);
+        learner.self.setSyncLimit(2);
+
+        // this addr won't even be used since we fake the Socket.connect
+        InetSocketAddress addr = new InetSocketAddress(1111);
+
+        // we expect this to throw an IOException since we're faking socket connect errors every time
+        learner.connectToLeader(addr);
+    }
+
+    @Test(expected=IOException.class)
+    public void connectionInitLimitTimeoutTest() throws Exception {
+        TimeoutLearner learner = new TimeoutLearner();
+        learner.self = new QuorumPeer();
+        learner.self.setTickTime(2000);
+        learner.self.setInitLimit(5);
+        learner.self.setSyncLimit(2);
+
+        // this addr won't even be used since we fake the Socket.connect
+        InetSocketAddress addr = new InetSocketAddress(1111);
+        
+        // pretend each connect attempt takes 3000 milliseconds
+        learner.setTimeMultiplier((long)3000 * 1000000);
+
+        // we expect this to throw an IOException since we're faking socket connect errors every time
+        learner.connectToLeader(addr);
     }
 
     @Test
