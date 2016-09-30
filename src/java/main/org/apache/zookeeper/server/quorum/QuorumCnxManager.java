@@ -85,7 +85,7 @@ public class QuorumCnxManager {
      * Connection time out value in milliseconds 
      */
     
-    private int cnxTO = 5000;
+    private int cnxTO = 1500;
     
     /*
      * Local IP address
@@ -427,6 +427,9 @@ public class QuorumCnxManager {
         }
     }
     
+    protected Enumeration<Long> getServers() {
+        return queueSendMap.keys();
+    }
     
     /**
      * Try to establish a connection with each server if one
@@ -435,7 +438,7 @@ public class QuorumCnxManager {
     
     public void connectAll(){
         long sid;
-        for(Enumeration<Long> en = queueSendMap.keys();
+        for(Enumeration<Long> en = getServers();
             en.hasMoreElements();){
             sid = en.nextElement();
             connectOne(sid);

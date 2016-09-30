@@ -28,6 +28,9 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import java.util.List;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.net.Socket;
 
 import org.apache.zookeeper.common.Time;
@@ -55,8 +58,11 @@ public class CnxManagerTest extends ZKTestCase {
     int peerClientPort[];
     @Before
     public void setUp() throws Exception {
+        setUp(3);
+    }
 
-        this.count = 3;
+    public void setUp(int serverCount) throws Exception {
+        this.count = serverCount;
         this.peers = new HashMap<Long,QuorumServer>(count);
         peerTmpdir = new File[count];
         peerQuorumPort = new int[count];
@@ -175,6 +181,102 @@ public class CnxManagerTest extends ZKTestCase {
                 Assert.fail("Did not receive expected message");
         }
 
+    }
+
+    /**
+     * QuorumCnxManager which provides a deterministic order
+     * for the list of servers to connect to.
+     */
+    class CustomQuorumCnxManager extends QuorumCnxManager {
+        
+        CustomQuorumCnxManager(QuorumPeer peer) {
+            super(peer);
+        }
+
+        /**
+         * Sort and return the list of servers.
+         */
+        @Override
+        protected Enumeration<Long> getServers() {
+            List<Long> serverList = Collections.list(super.getServers());
+            Collections.sort(serverList);
+            return Collections.enumeration(serverList);
+        }
+    }
+
+    /**
+     * SolidFire-specific test case for FogBugz-17410
+     * Ensures that all votes can be delivered in the time it takes for a follower
+     * to give up on following the leader, since the leader will not accept
+     * followers until it receives enough votes, and followers may not wait long enough.
+     *
+     * This test is using 5 servers specifically for now to test a non-ideal
+     * but low-risk fix that works for the ensemble sizes we use.
+     *
+     * In the future, when a fix is implemented to make QuorumCnxManager::connectOne
+     * non-blocking, consider extending this to deal with larger ensemble sizes too.
+     * Until then, it doesn't make sense to contribute this to mainline ZooKeeper.
+     *
+     * @throws Exception
+     */
+    @Test
+    public void testAllMessagesDeliveredWithDeadServers() throws Exception {
+        // Use 5 servers (makes the issue being exposed here worse than 3 servers)
+        final int serverCount = 5;
+        setUp(serverCount);
+        Random rand = new Random();
+
+        ArrayList<QuorumPeer> quorumPeers = new ArrayList<QuorumPeer>();
+        ArrayList<QuorumCnxManager> cnxManagers = new ArrayList<QuorumCnxManager>();
+
+        // Loop for each peer
+        for (int i = 0; i < 5; i++) {
+            
+            QuorumPeer peer;
+
+            if (i < 3) {
+                peer = new QuorumPeer(peers, peerTmpdir[i], peerTmpdir[i], peerClientPort[i], 3, i, 1000, 2, 2);
+
+                QuorumCnxManager cnxManager = new CustomQuorumCnxManager(peer);
+                QuorumCnxManager.Listener listener = cnxManager.listener;
+                
+                Assert.assertNotNull("Null listener when initializing cnx manager", listener);
+                listener.start();
+                
+                quorumPeers.add(peer);
+                cnxManagers.add(cnxManager);
+
+            } else {
+                int lastOctet = rand.nextInt() & 0xFF;
+                int deadPort = PortAssignment.unique();
+                String deadAddress = "10.1.1." + lastOctet;
+
+                LOG.info("This is the dead address I'm trying: " + deadAddress);
+
+                peers.put(Long.valueOf(i),
+                        new QuorumServer(i,
+                                new InetSocketAddress(deadAddress, deadPort),
+                                new InetSocketAddress(deadAddress, PortAssignment.unique()),
+                                new InetSocketAddress(deadAddress, PortAssignment.unique())));
+            }
+        }
+        
+        for (int i = 0; i < 5; i++) {
+            cnxManagers.get(0).toSend((long)i, createMsg(ServerState.LOOKING.ordinal(), 1, -1, 1));
+        }
+
+        long begin = Time.currentElapsedTime();
+        cnxManagers.get(0).connectAll();
+        long end = Time.currentElapsedTime();
+        
+        long elapsed = end - begin;
+
+        // 4000 is the hard-coded number of seconds a follower will currently
+        // wait before giving up on a leader (see Learner::connectToLeader).
+        // All votes need to be sent before this duration has passed.
+        if (elapsed > 4000) {
+            Assert.fail("connectAll() took too long: " + elapsed + "ms");
+        }
     }
 
     @Test
