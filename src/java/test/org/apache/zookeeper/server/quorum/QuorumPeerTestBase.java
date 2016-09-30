@@ -52,6 +52,11 @@ public class QuorumPeerTestBase extends ZKTestCase implements Watcher {
                 QuorumBase.shutdown(quorumPeer);
             }
         }
+
+        @Override
+        public void runFromConfig(QuorumPeerConfig config) throws IOException {
+            super.runFromConfig(config);
+        }
     }
     
     public static class MainThreadReconfigRecovery extends MainThread {
@@ -128,9 +133,13 @@ public class QuorumPeerTestBase extends ZKTestCase implements Watcher {
         Thread currentThread;
 
         synchronized public void start() {
-            main = new TestQPMain();
+            main = getTestQPMain();
             currentThread = new Thread(this);
             currentThread.start();
+        }
+
+        public TestQPMain getTestQPMain() {
+            return new TestQPMain();
         }
 
         public void run() {
@@ -169,6 +178,10 @@ public class QuorumPeerTestBase extends ZKTestCase implements Watcher {
         public void clean() {
             ClientBase.recursiveDelete(main.quorumPeer.getTxnFactory()
                     .getDataDir());
+        }
+
+        public QuorumPeer getQuorumPeer() {
+            return main.quorumPeer;
         }
     }
 }
