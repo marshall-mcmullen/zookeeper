@@ -490,14 +490,30 @@ int32_t fetch_and_add(volatile int32_t* operand, int incr)
 #endif
 }
 
+static int32_t xid = 0;
+static pthread_mutex_t xid_lock = PTHREAD_MUTEX_INITIALIZER;
+
 // make sure the static xid is initialized before any threads started
-__attribute__((constructor)) int32_t get_xid()
+int32_t get_xid()
 {
-    static int32_t xid = -1;
-    if (xid == -1) {
-        xid = time(0);
+    int32_t new_xid;
+
+    pthread_mutex_lock(&xid_lock);
+    if (xid == INT32_MAX) {
+        xid = 0;
     }
-    return fetch_and_add(&xid,1);
+    xid++;
+    new_xid = xid;
+    pthread_mutex_unlock(&xid_lock);
+
+    return new_xid;
+}
+
+void set_xid(int32_t new_xid)
+{
+    pthread_mutex_lock(&xid_lock);
+    xid = new_xid;
+    pthread_mutex_unlock(&xid_lock);
 }
 
 void lock_reconfig(struct _zhandle *zh)

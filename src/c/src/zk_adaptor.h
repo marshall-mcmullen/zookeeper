@@ -284,6 +284,10 @@ void api_prolog(zhandle_t* zh);
 int api_epilog(zhandle_t *zh, int rc);
 int32_t get_xid();
 
+#ifdef THREADED
+void set_xid(int32_t new_xid);
+#endif
+
 // returns the new value of the ref counter
 int32_t inc_ref_counter(zhandle_t* zh,int i);
 

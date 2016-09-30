@@ -216,6 +216,7 @@ class Zookeeper_simpleSystem : public CPPUNIT_NS::TestFixture
     CPPUNIT_TEST(testWatcherAutoResetWithLocal);
     CPPUNIT_TEST(testGetChildren2);
     CPPUNIT_TEST(testLastZxid);
+    CPPUNIT_TEST(testClientXid);
 #endif
     CPPUNIT_TEST_SUITE_END();
 
@@ -1289,6 +1290,33 @@ public:
       zookeeper_close(zk1);
       zookeeper_close(zk2);
     }
+
+    #ifdef THREADED
+    void testClientXid() {
+        // ZOOKEEPER-1485 - test client xid overflow
+        // (and other basic operations as a sanity check)
+
+        set_xid(0);
+
+        int32_t old_xid;
+        int32_t xid = get_xid();
+
+        // First xid after setting back to 0 should be 1
+        CPPUNIT_ASSERT_EQUAL(1, xid);
+
+        // Loop for a few times to make sure xid is incremented
+        for (int i = 0; i < 5; ++i) {
+            old_xid = xid;
+            xid = get_xid();
+            CPPUNIT_ASSERT_EQUAL(old_xid + 1, xid);
+        }
+
+        // Check xid overflow
+        set_xid(INT32_MAX - 1);
+        CPPUNIT_ASSERT_EQUAL(INT32_MAX, get_xid());
+        CPPUNIT_ASSERT_EQUAL(1, get_xid());
+    }
+    #endif
 };
 
 volatile int Zookeeper_simpleSystem::count;
