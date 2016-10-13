@@ -47,12 +47,17 @@ import org.apache.zookeeper.server.quorum.Leader.Proposal;
 import org.apache.zookeeper.test.ClientBase;
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.Rule;
+import org.junit.rules.ErrorCollector;
 
 /**
  * Test stand-alone server.
  *
  */
 public class QuorumPeerMainTest extends QuorumPeerTestBase {
+    @Rule
+    public ErrorCollector collector = new ErrorCollector();
+
     /**
      * Verify the ability to start a cluster.
      */
@@ -307,6 +312,95 @@ public class QuorumPeerMainTest extends QuorumPeerTestBase {
         Assert.assertEquals(
                 "Validating that the deposed leader caught up on changes it missed",
                 output[0], 2);
+    }
+
+    @Test
+    public void testTransactionLogGap() throws Exception {
+        // Force snapshots temporarily so the test doesn't have to write a huge amount of data
+        System.setProperty("zookeeper.forceSnapshotSync", "true");
+
+        // The transaction log preallocates a lot of space, and this test requires the leader to use a diff later.
+        // Set snapshotSizeFactor ridiculously high to ensure a diff is preferred.
+        System.setProperty("zookeeper.snapshotSizeFactor", "10000000");
+
+        // Use five servers since two have to be down at the same time without quorum loss
+        int numServers = 5;
+        Servers servers = LaunchServers(numServers);
+
+        // Use four different paths to make the results easier to understand
+        // They will be created in the order they are listed here
+        String w = "/w";
+        String x = "/x";
+        String y = "/y";
+        String z = "/z";
+
+        // Create w as a baseline path that all five servers should have
+        servers.zk[4].create(w, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        servers.zk[4].getData(w, false, null);
+
+        // Kill server 4
+        servers.mt[4].shutdown();
+        Thread.sleep(1000);
+
+        // Create path x while server 4 is down
+        servers.zk[0].create(x, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        servers.zk[0].getData(x, false, null);
+
+        // Now kill server 0
+        servers.mt[0].shutdown();
+        Thread.sleep(1000);
+
+        // Create path y while servers 0 and 4 are both down
+        servers.zk[2].create(y, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        servers.zk[2].getData(y, false, null);
+
+        // Start server 4 back up.
+        // It will get a snapshot from the leader because forceSnapshotSync is turned on
+        // In a production scenario, this could be triggered by having enough transactions while 4 was down.
+        servers.mt[4].start();
+        Thread.sleep(1000);
+
+        // Create path z while server 0 is still down
+        servers.zk[4].create(z, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        servers.zk[4].getData(z, false, null);
+
+        // Turn off forceSnapshotSync so server 0 will have normal sync behavior when it comes up
+        System.setProperty("zookeeper.forceSnapshotSync", "false");
+
+        // Force server 4 to be the leader by killing the current leader.
+        // This relies on the current election implementation to choose the highest sid as a tiebreaker.
+        for (int i = 0; i < numServers; i++) {
+            if (servers.mt[i].main.quorumPeer.leader != null) {
+                if (i != 4) {
+                    servers.mt[i].shutdown();
+                    Thread.sleep(1000);
+                    servers.mt[i].start();
+                    Thread.sleep(1000);
+                    break;
+                }
+            }
+        }
+        Assert.assertTrue(servers.mt[4].main.quorumPeer.leader != null);
+
+        // Start server 0 back up.
+        // Server 4 will sync with it.
+        servers.mt[0].start();
+        Thread.sleep(1000);
+
+        // Now try calling getData on every path for every server. They should all succeed
+        // since all the paths were created.
+        String[] paths = {w, x, y, z};
+        for (int i = 0; i < numServers; i++) {
+            for (String path : paths) {
+                try {
+                    servers.zk[i].getData(path, false, null);
+                    LOG.info("Server " + i + " completed getData for " + path);
+                } catch (Exception e) {
+                    LOG.info("Server " + i + " encountered exception " + e);
+                    collector.addError(e);
+                }
+            }
+        }
     }
 
     private void waitForOne(ZooKeeper zk, States state) throws InterruptedException {

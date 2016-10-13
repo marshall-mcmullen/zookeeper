@@ -92,6 +92,11 @@ public class ZKDatabase {
      * @param snapLog the FileTxnSnapLog mapping this zkdatabase
      */
     public ZKDatabase(FileTxnSnapLog snapLog) {
+        String systemSnapshotSizeFactor = System.getProperty(SNAPSHOT_SIZE_FACTOR);
+        if (systemSnapshotSizeFactor != null) {
+            this.snapshotSizeFactor = Float.valueOf(systemSnapshotSizeFactor);
+            LOG.info("Setting snapshotSizeFactor to " + this.snapshotSizeFactor);
+        }
         dataTree = new DataTree();
         sessionsWithTimeouts = new ConcurrentHashMap<Long, Integer>();
         this.snapLog = snapLog;

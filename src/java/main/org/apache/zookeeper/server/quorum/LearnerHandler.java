@@ -179,6 +179,11 @@ public class LearnerHandler extends Thread {
 
     LearnerHandler(Socket sock, Leader leader) throws IOException {
         super("LearnerHandler-" + sock.getRemoteSocketAddress());
+        String systemForceSnapSync = System.getProperty(FORCE_SNAP_SYNC);
+        if (systemForceSnapSync != null) {
+            this.forceSnapSync = Boolean.parseBoolean(systemForceSnapSync);
+            LOG.info("Setting forceSnapSync to " + this.forceSnapSync);
+        }
         this.sock = sock;
         this.leader = leader;
         leader.addLearnerHandler(this);
