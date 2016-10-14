@@ -21,6 +21,14 @@ package org.apache.zookeeper.server;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.OutputStreamWriter;
+import java.io.FileReader;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -39,6 +47,7 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs;
+import org.apache.zookeeper.common.AtomicFileOutputStream;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 import org.apache.zookeeper.server.DataTree.ProcessTxnResult;
@@ -84,6 +93,8 @@ public class ZKDatabase {
     protected LinkedList<Proposal> committedLog = new LinkedList<Proposal>();
     protected ReentrantReadWriteLock logLock = new ReentrantReadWriteLock();
     volatile private boolean initialized = false;
+
+    public static final String LAST_SNAP_RECEIVED_FILENAME = "lastSnapReceived";
 
     /**
      * the filetxnsnaplog that this zk database
@@ -571,6 +582,70 @@ public class ZKDatabase {
              this.dataTree.setData(ZooDefs.CONFIG_NODE, qv.toString().getBytes(), -1, qv.getVersion(), System.currentTimeMillis());           
         } catch (NoNodeException e) {
            System.out.println("configuration node missing - should not happen");         
+        }
+    }
+
+    /**
+     * Read the value from a file on disk indicating the zxid of the last
+     * transaction contained in the last snapshot we have received from
+     * a leader. Default to 0 if the file doesn't exist or contains invalid data.
+     */
+    public long getLastSnapReceived() throws IOException {
+        if (snapLog == null) {
+            return 0;
+        }
+
+        File file = new File(snapLog.getDataDir(), LAST_SNAP_RECEIVED_FILENAME);
+        BufferedReader br;
+
+        try {
+            br = new BufferedReader(new FileReader(file));
+        } catch (FileNotFoundException e) {
+            return 0;
+        }
+        String line = "";
+        try {
+            line = br.readLine();
+            return Long.parseLong(line);
+        } catch (NumberFormatException e) {
+            return 0;
+        } finally {
+            br.close();
+        }
+    }
+
+    /**
+     * Update or create a file on disk indicating the zxid of the last
+     * transaction contained in the last snapshot we have received from
+     * a leader.
+     */
+    public void setLastSnapReceived(long zxid) throws IOException {
+        if (snapLog == null) {
+            return;
+        }
+
+        File file = new File(snapLog.getDataDir(), LAST_SNAP_RECEIVED_FILENAME);
+        AtomicFileOutputStream out = new AtomicFileOutputStream(file);
+        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(out));
+        boolean aborted = false;
+        try {
+            bw.write(Long.toString(zxid));
+            bw.flush();
+
+            out.flush();
+        } catch (IOException e) {
+            LOG.error("Failed to write new file " + file, e);
+            // worst case here the tmp file/resources(fd) are not cleaned up
+            //   and the caller will be notified (IOException)
+            aborted = true;
+            out.abort();
+            throw e;
+        } finally {
+            if (!aborted) {
+                // if the close operation (rename) fails we'll get notified.
+                // worst case the tmp file may still exist
+                out.close();
+            }
         }
     }
  

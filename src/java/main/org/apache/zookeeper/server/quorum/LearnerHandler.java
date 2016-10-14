@@ -671,6 +671,14 @@ public class LearnerHandler extends Thread {
                 maxCommittedLog = lastProcessedZxid;
             }
 
+            // Last zxid update contained in the last snapshot we have received from a leader
+            long lastSnapReceived;
+            try {
+                lastSnapReceived = db.getLastSnapReceived();
+            } catch (IOException e) {
+                lastSnapReceived = 0;
+            }
+
             /*
              * Here are the cases that we want to handle
              *
@@ -679,10 +687,13 @@ public class LearnerHandler extends Thread {
              * 3. Follower has txn that we haven't seen. This may be old leader
              *    so we need to send TRUNC. However, if peer has newEpochZxid,
              *    we cannot send TRUC since the follower has no txnlog
-             * 4. Follower is within committedLog range or already in-sync.
+             * 4. Follower is missing transactions we do not have in either
+             *    txnlog or committedLog because their updates are contained in
+             *    in a snapshot we received from a previous leader.
+             * 5. Follower is within committedLog range or already in-sync.
              *    We may need to send DIFF or TRUNC depending on follower's zxid
              *    We always send empty DIFF if follower is already in-sync
-             * 5. Follower missed the committedLog. We will try to use on-disk
+             * 6. Follower missed the committedLog. We will try to use on-disk
              *    txnlog + committedLog to sync with follower. If that fail,
              *    we will send snapshot
              */
@@ -706,6 +717,12 @@ public class LearnerHandler extends Thread {
                 currentZxid = maxCommittedLog;
                 needOpPacket = false;
                 needSnap = false;
+            } else if (lastSnapReceived > peerLastZxid) {
+                // We have received a snapshot from another leader containing updates which
+                // the follower is missing. Updates contained in that snapshot may not be in our
+                // transaction log, so a snapshot is required.
+                LOG.info("Don't have required transactions to send diff for peer sid: " +
+                          getSid() + ". Falling back to snapshot.");
             } else if ((maxCommittedLog >= peerLastZxid)
                     && (minCommittedLog <= peerLastZxid)) {
                 // Follower is within commitLog range
