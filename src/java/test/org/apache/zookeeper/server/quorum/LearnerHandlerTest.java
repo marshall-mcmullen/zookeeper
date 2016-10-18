@@ -24,6 +24,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.Iterator;
@@ -36,6 +37,7 @@ import org.apache.zookeeper.server.ZKDatabase;
 import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
 import org.apache.zookeeper.server.quorum.Leader.Proposal;
 import org.apache.zookeeper.server.util.ZxidUtils;
+import org.apache.zookeeper.test.ClientBase;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -67,7 +69,7 @@ public class LearnerHandlerTest extends ZKTestCase {
         LinkedList<Proposal> committedLog = new LinkedList<Leader.Proposal>();
         LinkedList<Proposal> txnLog = new LinkedList<Leader.Proposal>();
 
-        public MockZKDatabase(FileTxnSnapLog snapLog) {
+        public MockZKDatabase(FileTxnSnapLog snapLog) throws IOException {
             super(snapLog);
         }
 
@@ -137,7 +139,9 @@ public class LearnerHandlerTest extends ZKTestCase {
 
         sock = mock(Socket.class);
 
-        db = new MockZKDatabase(null);
+        File tmpdir = ClientBase.createTmpDir();
+        FileTxnSnapLog snapLog = new FileTxnSnapLog(tmpdir, tmpdir);
+        db = new MockZKDatabase(snapLog);
         learnerHandler = new MockLearnerHandler(sock, leader);
     }
 

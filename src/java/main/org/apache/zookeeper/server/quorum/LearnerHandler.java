@@ -672,11 +672,15 @@ public class LearnerHandler extends Thread {
             }
 
             // Last zxid update contained in the last snapshot we have received from a leader
-            long lastSnapReceived;
+            long lastSnapReceived = 0;
+            boolean lastSnapReceivedError = false;
             try {
                 lastSnapReceived = db.getLastSnapReceived();
-            } catch (IOException e) {
-                lastSnapReceived = 0;
+            } catch (Exception e) {
+                // In the case of any error, set a flag to indicate we need to use
+                // a snapshot to ensure correctness
+                LOG.warn("Error reading zxid of last snapshot received: " + ex);
+                lastSnapReceivedError = true;
             }
 
             /*
@@ -717,7 +721,7 @@ public class LearnerHandler extends Thread {
                 currentZxid = maxCommittedLog;
                 needOpPacket = false;
                 needSnap = false;
-            } else if (lastSnapReceived > peerLastZxid) {
+            } else if (lastSnapReceivedError || lastSnapReceived > peerLastZxid) {
                 // We have received a snapshot from another leader containing updates which
                 // the follower is missing. Updates contained in that snapshot may not be in our
                 // transaction log, so a snapshot is required.

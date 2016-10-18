@@ -20,15 +20,6 @@ package org.apache.zookeeper.server;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.OutputStreamWriter;
-import java.io.FileReader;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -47,7 +38,7 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs;
-import org.apache.zookeeper.common.AtomicFileOutputStream;
+import org.apache.zookeeper.common.IOUtils;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 import org.apache.zookeeper.server.DataTree.ProcessTxnResult;
@@ -95,6 +86,7 @@ public class ZKDatabase {
     volatile private boolean initialized = false;
 
     public static final String LAST_SNAP_RECEIVED_FILENAME = "lastSnapReceived";
+    private File lastSnapReceivedFile;
 
     /**
      * the filetxnsnaplog that this zk database
@@ -102,7 +94,7 @@ public class ZKDatabase {
      * between a filetxnsnaplog and zkdatabase.
      * @param snapLog the FileTxnSnapLog mapping this zkdatabase
      */
-    public ZKDatabase(FileTxnSnapLog snapLog) {
+    public ZKDatabase(FileTxnSnapLog snapLog) throws IOException {
         String systemSnapshotSizeFactor = System.getProperty(SNAPSHOT_SIZE_FACTOR);
         if (systemSnapshotSizeFactor != null) {
             this.snapshotSizeFactor = Float.valueOf(systemSnapshotSizeFactor);
@@ -111,6 +103,11 @@ public class ZKDatabase {
         dataTree = new DataTree();
         sessionsWithTimeouts = new ConcurrentHashMap<Long, Integer>();
         this.snapLog = snapLog;
+
+        lastSnapReceivedFile = new File(snapLog.getDataDir(), LAST_SNAP_RECEIVED_FILENAME);
+        if (!lastSnapReceivedFile.exists()) {
+            setLastSnapReceived(0);
+        }
     }
 
     /**
@@ -588,30 +585,10 @@ public class ZKDatabase {
     /**
      * Read the value from a file on disk indicating the zxid of the last
      * transaction contained in the last snapshot we have received from
-     * a leader. Default to 0 if the file doesn't exist or contains invalid data.
+     * a leader.
      */
     public long getLastSnapReceived() throws IOException {
-        if (snapLog == null) {
-            return 0;
-        }
-
-        File file = new File(snapLog.getDataDir(), LAST_SNAP_RECEIVED_FILENAME);
-        BufferedReader br;
-
-        try {
-            br = new BufferedReader(new FileReader(file));
-        } catch (FileNotFoundException e) {
-            return 0;
-        }
-        String line = "";
-        try {
-            line = br.readLine();
-            return Long.parseLong(line);
-        } catch (NumberFormatException e) {
-            return 0;
-        } finally {
-            br.close();
-        }
+        return IOUtils.readLongFromFile(lastSnapReceivedFile);
     }
 
     /**
@@ -620,33 +597,7 @@ public class ZKDatabase {
      * a leader.
      */
     public void setLastSnapReceived(long zxid) throws IOException {
-        if (snapLog == null) {
-            return;
-        }
-
-        File file = new File(snapLog.getDataDir(), LAST_SNAP_RECEIVED_FILENAME);
-        AtomicFileOutputStream out = new AtomicFileOutputStream(file);
-        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(out));
-        boolean aborted = false;
-        try {
-            bw.write(Long.toString(zxid));
-            bw.flush();
-
-            out.flush();
-        } catch (IOException e) {
-            LOG.error("Failed to write new file " + file, e);
-            // worst case here the tmp file/resources(fd) are not cleaned up
-            //   and the caller will be notified (IOException)
-            aborted = true;
-            out.abort();
-            throw e;
-        } finally {
-            if (!aborted) {
-                // if the close operation (rename) fails we'll get notified.
-                // worst case the tmp file may still exist
-                out.close();
-            }
-        }
+        IOUtils.writeLongToFile(lastSnapReceivedFile, zxid);
     }
  
     /**
