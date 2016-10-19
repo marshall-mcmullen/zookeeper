@@ -19,7 +19,9 @@
 package org.apache.zookeeper.server;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -597,7 +599,7 @@ public class ZKDatabase {
      * a leader.
      */
     public void setLastSnapReceived(long zxid) throws IOException {
-        IOUtils.writeLongToFile(lastSnapReceivedFile, zxid);
+        IOUtils.writeLongToFileAtomic(lastSnapReceivedFile, zxid);
     }
  
     /**

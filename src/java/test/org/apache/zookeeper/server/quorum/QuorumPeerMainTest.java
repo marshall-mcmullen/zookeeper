@@ -45,6 +45,7 @@ import org.apache.zookeeper.ZooKeeper.States;
 import org.apache.zookeeper.common.Time;
 import org.apache.zookeeper.server.quorum.Leader.Proposal;
 import org.apache.zookeeper.test.ClientBase;
+import org.apache.zookeeper.test.QuorumBase;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.Rule;
@@ -338,17 +339,17 @@ public class QuorumPeerMainTest extends QuorumPeerTestBase {
         servers.zk[4].create(w, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         servers.zk[4].getData(w, false, null);
 
-        // Kill server 4
-        servers.mt[4].shutdown();
-        Thread.sleep(1000);
+        // Kill server 4 and wait for recovery
+        QuorumBase.shutdown(servers.mt[4].main.quorumPeer);
+        QuorumBase.waitForServerUp(servers.connectStrings[0], CONNECTION_TIMEOUT);
 
         // Create path x while server 4 is down
         servers.zk[0].create(x, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         servers.zk[0].getData(x, false, null);
 
         // Now kill server 0
-        servers.mt[0].shutdown();
-        Thread.sleep(1000);
+        QuorumBase.shutdown(servers.mt[0].main.quorumPeer);
+        QuorumBase.waitForServerUp(servers.connectStrings[2], CONNECTION_TIMEOUT);
 
         // Create path y while servers 0 and 4 are both down
         servers.zk[2].create(y, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -358,7 +359,7 @@ public class QuorumPeerMainTest extends QuorumPeerTestBase {
         // It will get a snapshot from the leader because forceSnapshotSync is turned on
         // In a production scenario, this could be triggered by having enough transactions while 4 was down.
         servers.mt[4].start();
-        Thread.sleep(1000);
+        QuorumBase.waitForServerUp(servers.connectStrings[4], CONNECTION_TIMEOUT);
 
         // Create path z while server 0 is still down
         servers.zk[4].create(z, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -370,14 +371,11 @@ public class QuorumPeerMainTest extends QuorumPeerTestBase {
         // Force server 4 to be the leader by killing the current leader.
         // This relies on the current election implementation to choose the highest sid as a tiebreaker.
         for (int i = 0; i < numServers; i++) {
-            if (servers.mt[i].main.quorumPeer.leader != null) {
-                if (i != 4) {
-                    servers.mt[i].shutdown();
-                    Thread.sleep(1000);
-                    servers.mt[i].start();
-                    Thread.sleep(1000);
-                    break;
-                }
+            if (servers.mt[i].main.quorumPeer.leader != null && i != 4) {
+                QuorumBase.shutdown(servers.mt[i].main.quorumPeer);
+                servers.mt[i].start();
+                QuorumBase.waitForServerUp(servers.connectStrings[i], CONNECTION_TIMEOUT);
+                break;
             }
         }
         Assert.assertTrue(servers.mt[4].main.quorumPeer.leader != null);
@@ -385,7 +383,7 @@ public class QuorumPeerMainTest extends QuorumPeerTestBase {
         // Start server 0 back up.
         // Server 4 will sync with it.
         servers.mt[0].start();
-        Thread.sleep(1000);
+        QuorumBase.waitForServerUp(servers.connectStrings[0], CONNECTION_TIMEOUT);
 
         // Now try calling getData on every path for every server. They should all succeed
         // since all the paths were created.
@@ -437,6 +435,7 @@ public class QuorumPeerMainTest extends QuorumPeerTestBase {
     private static class Servers {
         MainThread mt[];
         ZooKeeper zk[];
+        String connectStrings[];
     }
 
     /**
@@ -460,16 +459,19 @@ public class QuorumPeerMainTest extends QuorumPeerTestBase {
 
         MainThread mt[] = new MainThread[SERVER_COUNT];
         ZooKeeper zk[] = new ZooKeeper[SERVER_COUNT];
+        String connectStrings[] = new String[SERVER_COUNT];
         for (int i = 0; i < SERVER_COUNT; i++) {
             mt[i] = new MainThread(i, clientPorts[i], quorumCfgSection);
             mt[i].start();
-            zk[i] = new ZooKeeper("127.0.0.1:" + clientPorts[i], ClientBase.CONNECTION_TIMEOUT, this);
+            connectStrings[i] = "127.0.0.1:" + clientPorts[i];
+            zk[i] = new ZooKeeper(connectStrings[i], ClientBase.CONNECTION_TIMEOUT, this);
         }
 
         waitForAll(zk, States.CONNECTED);
 
         svrs.mt = mt;
         svrs.zk = zk;
+        svrs.connectStrings = connectStrings;
         return svrs;
     }
 

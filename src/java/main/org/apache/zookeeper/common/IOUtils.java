@@ -140,7 +140,7 @@ public class IOUtils {
 	 * @param value the long value to write to the named file
 	 * @throws IOException if the file cannot be written atomically
 	 */
-    public static void writeLongToFile(File file, long value) throws IOException {
+    public static void writeLongToFileAtomic(File file, long value) throws IOException {
         AtomicFileOutputStream out = new AtomicFileOutputStream(file);
         BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(out));
         boolean aborted = false;

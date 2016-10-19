@@ -679,7 +679,7 @@ public class LearnerHandler extends Thread {
             } catch (Exception e) {
                 // In the case of any error, set a flag to indicate we need to use
                 // a snapshot to ensure correctness
-                LOG.warn("Error reading zxid of last snapshot received: " + ex);
+                LOG.warn("Error reading zxid of last snapshot received: " + e);
                 lastSnapReceivedError = true;
             }
 
