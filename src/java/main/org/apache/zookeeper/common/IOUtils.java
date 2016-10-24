@@ -41,7 +41,6 @@ import org.slf4j.Logger;
  */
 
 public class IOUtils {
-
     private static final Logger LOG = LoggerFactory.getLogger(IOUtils.class);
 
     /**
