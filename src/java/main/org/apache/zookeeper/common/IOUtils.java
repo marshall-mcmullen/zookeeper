@@ -31,9 +31,9 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 
-import org.apache.zookeeper.common.AtomicFileOutputStream;
+import org.apache.zookeeper.common.AtomicFileWritingIdiom;
+import org.apache.zookeeper.common.AtomicFileWritingIdiom.WriterStatement;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /*
  * This code is originally from HDFS, see the similarly named files there
