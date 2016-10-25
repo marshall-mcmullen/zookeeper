@@ -31,7 +31,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -128,6 +132,15 @@ public abstract class ClientBase extends ZKTestCase {
 
             }
         }
+        public Future<?> waitForConnectedAsync(final long timeout) {
+            ExecutorService executorService = Executors.newSingleThreadExecutor();
+            return executorService.submit(new Callable<Void>() {
+                public Void call() throws Exception {
+                    waitForConnected(timeout);
+                    return null;
+                }
+            });
+        }
         synchronized public void waitForDisconnected(long timeout)
             throws InterruptedException, TimeoutException
         {
@@ -141,6 +154,15 @@ public abstract class ClientBase extends ZKTestCase {
                 throw new TimeoutException("Did not disconnect");
 
             }
+        }
+        public Future<?> waitForDisconnectedAsync(final long timeout) {
+            ExecutorService executorService = Executors.newSingleThreadExecutor();
+            return executorService.submit(new Callable<Void>() {
+                public Void call() throws Exception {
+                    waitForDisconnected(timeout);
+                    return null;
+                }
+            });
         }
     }
 
