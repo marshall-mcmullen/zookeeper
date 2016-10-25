@@ -26,6 +26,7 @@ import java.io.StringReader;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Future;
 import java.nio.channels.SocketChannel;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -350,7 +351,7 @@ public class QuorumPeerMainTest extends QuorumPeerTestBase {
         servers.zk[0].getData(x, false, null);
 
         // Now kill server 0
-        QuorumBase.shutdown(servers.mt[0].main.quorumPeer);
+        servers.mt[0].shutdown();
         servers.watchers[0].waitForDisconnected(ClientBase.CONNECTION_TIMEOUT);
 
         // Create path y while servers 0 and 4 are both down
