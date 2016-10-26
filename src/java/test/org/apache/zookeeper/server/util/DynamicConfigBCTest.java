@@ -31,6 +31,7 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.apache.zookeeper.PortAssignment;
 import org.apache.zookeeper.server.ZKDatabase;
+import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
 import org.apache.zookeeper.server.quorum.QuorumPeer;
 import org.apache.zookeeper.server.quorum.QuorumPeerConfig;
 import org.apache.zookeeper.server.quorum.QuorumPeerConfig.ConfigException;
@@ -113,6 +114,7 @@ public class DynamicConfigBCTest extends QuorumPeer {
             setDynamicConfigFilename(config.getDynamicConfigFilename());
             setConfigFileName(config.getConfigFilename());
             setConfigBackwardCompatibility(config.getConfigBackwardCompatibility());
+            setTxnFactory(new FileTxnSnapLog(tmpDir, tmpDir));
             setZKDatabase(new ZKDatabase(getTxnFactory()));
             setQuorumVerifier(config.getQuorumVerifier(), false);
             

@@ -19,6 +19,7 @@
 package org.apache.zookeeper.server;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Collection;
@@ -39,6 +40,7 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs;
+import org.apache.zookeeper.common.IOUtils;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 import org.apache.zookeeper.server.DataTree.ProcessTxnResult;
@@ -85,16 +87,29 @@ public class ZKDatabase {
     protected ReentrantReadWriteLock logLock = new ReentrantReadWriteLock();
     volatile private boolean initialized = false;
 
+    public static final String LAST_SNAP_RECEIVED_FILENAME = "lastSnapReceived";
+    private File lastSnapReceivedFile;
+
     /**
      * the filetxnsnaplog that this zk database
      * maps to. There is a one to one relationship
      * between a filetxnsnaplog and zkdatabase.
      * @param snapLog the FileTxnSnapLog mapping this zkdatabase
      */
-    public ZKDatabase(FileTxnSnapLog snapLog) {
+    public ZKDatabase(FileTxnSnapLog snapLog) throws IOException {
+        String systemSnapshotSizeFactor = System.getProperty(SNAPSHOT_SIZE_FACTOR);
+        if (systemSnapshotSizeFactor != null) {
+            this.snapshotSizeFactor = Float.valueOf(systemSnapshotSizeFactor);
+            LOG.info("Setting snapshotSizeFactor to " + this.snapshotSizeFactor);
+        }
         dataTree = new DataTree();
         sessionsWithTimeouts = new ConcurrentHashMap<Long, Integer>();
         this.snapLog = snapLog;
+
+        lastSnapReceivedFile = new File(snapLog.getDataDir(), LAST_SNAP_RECEIVED_FILENAME);
+        if (!lastSnapReceivedFile.exists()) {
+            setLastSnapReceived(0);
+        }
     }
 
     /**
@@ -567,6 +582,24 @@ public class ZKDatabase {
         } catch (NoNodeException e) {
            System.out.println("configuration node missing - should not happen");         
         }
+    }
+
+    /**
+     * Read the value from a file on disk indicating the zxid of the last
+     * transaction contained in the last snapshot we have received from
+     * a leader.
+     */
+    public long getLastSnapReceived() throws IOException {
+        return IOUtils.readLongFromFile(lastSnapReceivedFile);
+    }
+
+    /**
+     * Update or create a file on disk indicating the zxid of the last
+     * transaction contained in the last snapshot we have received from
+     * a leader.
+     */
+    public void setLastSnapReceived(long zxid) throws IOException {
+        IOUtils.writeLongToFileAtomic(lastSnapReceivedFile, zxid);
     }
  
     /**

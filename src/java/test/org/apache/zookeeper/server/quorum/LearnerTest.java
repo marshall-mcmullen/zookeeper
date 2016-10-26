@@ -69,6 +69,7 @@ public class LearnerTest extends ZKTestCase {
         }
         if (!dir.isDirectory()) {
             dir.delete();
+            return;
         }
         for (File child : dir.listFiles()) {
             recursiveDelete(child);

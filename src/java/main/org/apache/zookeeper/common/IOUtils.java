@@ -17,13 +17,23 @@
  */
 package org.apache.zookeeper.common;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.Closeable;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 
+import org.apache.zookeeper.common.AtomicFileOutputStream;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /*
  * This code is originally from HDFS, see the similarly named files there
@@ -31,6 +41,8 @@ import org.slf4j.Logger;
  */
 
 public class IOUtils {
+    private static final Logger LOG = LoggerFactory.getLogger(IOUtils.class);
+
     /**
      * Closes the stream ignoring {@link IOException}. Must only be called in
      * cleaning up from exception handlers.
@@ -117,6 +129,57 @@ public class IOUtils {
                 throw new IOException("Unable to write to output stream.");
             }
             bytesRead = in.read(buf);
+        }
+    }
+
+	/**
+	 * Write a long value to disk atomically. Either succeeds or an exception
+	 * is thrown.
+	 * @param file the file to write the long to
+	 * @param value the long value to write to the named file
+	 * @throws IOException if the file cannot be written atomically
+	 */
+    public static void writeLongToFileAtomic(File file, long value) throws IOException {
+        AtomicFileOutputStream out = new AtomicFileOutputStream(file);
+        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(out));
+        boolean aborted = false;
+        try {
+            bw.write(Long.toString(value));
+            bw.flush();
+
+            out.flush();
+        } catch (IOException e) {
+            LOG.error("Failed to write new file " + file, e);
+            // worst case here the tmp file/resources(fd) are not cleaned up
+            //   and the caller will be notified (IOException)
+            aborted = true;
+            out.abort();
+            throw e;
+        } finally {
+            if (!aborted) {
+                // if the close operation (rename) fails we'll get notified.
+                // worst case the tmp file may still exist
+                out.close();
+            }
+        }
+    }
+
+	/**
+	 * Read a long value from a file.
+	 * @param file the file to read the long from
+	 * @return the value read from the file
+	 * @throws IOException if a value can't be read from the file.
+	 */
+    public static long readLongFromFile(File file) throws IOException {
+        BufferedReader br = new BufferedReader(new FileReader(file));
+        String line = "";
+        try {
+            line = br.readLine();
+            return Long.parseLong(line);
+        } catch(NumberFormatException e) {
+            throw new IOException("Found " + line + " in " + file);
+        } finally {
+            br.close();
         }
     }
 

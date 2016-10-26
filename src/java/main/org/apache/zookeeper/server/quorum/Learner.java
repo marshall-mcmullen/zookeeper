@@ -382,6 +382,7 @@ public class Learner {
                     throw new IOException("Missing signature");                   
                 }
                 zk.getZKDatabase().setlastProcessedZxid(qp.getZxid());
+                zk.getZKDatabase().setLastSnapReceived(qp.getZxid());
             } else if (qp.getType() == Leader.TRUNC) {
                 //we need to truncate the log to the lastzxid of the leader
                 LOG.warn("Truncating log to get in sync with the leader 0x"
