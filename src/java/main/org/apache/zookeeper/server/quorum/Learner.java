@@ -369,6 +369,7 @@ public class Learner {
         synchronized (zk) {
             if (qp.getType() == Leader.DIFF) {
                 LOG.info("Getting a diff from the leader 0x" + Long.toHexString(qp.getZxid()));                
+                zk.getZKDatabase().setLastSyncWithLeader(qp.getZxid());
             }
             else if (qp.getType() == Leader.SNAP) {
                 LOG.info("Getting a snapshot from leader");
@@ -382,7 +383,7 @@ public class Learner {
                     throw new IOException("Missing signature");                   
                 }
                 zk.getZKDatabase().setlastProcessedZxid(qp.getZxid());
-                zk.getZKDatabase().setLastSnapReceived(qp.getZxid());
+                zk.getZKDatabase().setLastSyncWithLeader(qp.getZxid());
             } else if (qp.getType() == Leader.TRUNC) {
                 //we need to truncate the log to the lastzxid of the leader
                 LOG.warn("Truncating log to get in sync with the leader 0x"

@@ -87,8 +87,8 @@ public class ZKDatabase {
     protected ReentrantReadWriteLock logLock = new ReentrantReadWriteLock();
     volatile private boolean initialized = false;
 
-    public static final String LAST_SNAP_RECEIVED_FILENAME = "lastSnapReceived";
-    private File lastSnapReceivedFile;
+    public static final String LAST_SYNC_WITH_LEADER_FILENAME = "lastSyncWithLeader";
+    private File lastSyncWithLeaderFile;
 
     /**
      * the filetxnsnaplog that this zk database
@@ -106,9 +106,9 @@ public class ZKDatabase {
         sessionsWithTimeouts = new ConcurrentHashMap<Long, Integer>();
         this.snapLog = snapLog;
 
-        lastSnapReceivedFile = new File(snapLog.getDataDir(), LAST_SNAP_RECEIVED_FILENAME);
-        if (!lastSnapReceivedFile.exists()) {
-            setLastSnapReceived(0);
+        lastSyncWithLeaderFile = new File(snapLog.getDataDir(), LAST_SYNC_WITH_LEADER_FILENAME);
+        if (!lastSyncWithLeaderFile.exists()) {
+            setLastSyncWithLeader(0);
         }
     }
 
@@ -586,20 +586,20 @@ public class ZKDatabase {
 
     /**
      * Read the value from a file on disk indicating the zxid of the last
-     * transaction contained in the last snapshot we have received from
+     * transaction contained in the last snapshot or diff we have received from
      * a leader.
      */
-    public long getLastSnapReceived() throws IOException {
-        return IOUtils.readLongFromFile(lastSnapReceivedFile);
+    public long getLastSyncWithLeader() throws IOException {
+        return IOUtils.readLongFromFile(lastSyncWithLeaderFile);
     }
 
     /**
      * Update or create a file on disk indicating the zxid of the last
-     * transaction contained in the last snapshot we have received from
+     * transaction contained in the last snapshot or diff we have received from
      * a leader.
      */
-    public void setLastSnapReceived(long zxid) throws IOException {
-        IOUtils.writeLongToFileAtomic(lastSnapReceivedFile, zxid);
+    public void setLastSyncWithLeader(long zxid) throws IOException {
+        IOUtils.writeLongToFileAtomic(lastSyncWithLeaderFile, zxid);
     }
  
     /**
