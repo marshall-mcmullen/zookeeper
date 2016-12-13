@@ -671,16 +671,16 @@ public class LearnerHandler extends Thread {
                 maxCommittedLog = lastProcessedZxid;
             }
 
-            // Last zxid update contained in the last snapshot we have received from a leader
-            long lastSnapReceived = 0;
-            boolean lastSnapReceivedError = false;
+            // Last zxid update contained in the last snapshot or diff we have received from a leader
+            long lastSyncWithLeader = 0;
+            boolean lastSyncWithLeaderError = false;
             try {
-                lastSnapReceived = db.getLastSnapReceived();
+                lastSyncWithLeader = db.getLastSyncWithLeader();
             } catch (Exception e) {
                 // In the case of any error, set a flag to indicate we need to use
                 // a snapshot to ensure correctness
-                LOG.warn("Error reading zxid of last snapshot received: " + e);
-                lastSnapReceivedError = true;
+                LOG.warn("Error reading zxid of last sync with leader: " + e);
+                lastSyncWithLeaderError = true;
             }
 
             /*
@@ -721,10 +721,10 @@ public class LearnerHandler extends Thread {
                 currentZxid = maxCommittedLog;
                 needOpPacket = false;
                 needSnap = false;
-            } else if (lastSnapReceivedError || lastSnapReceived > peerLastZxid) {
-                // We have received a snapshot from another leader containing updates which
-                // the follower is missing. Updates contained in that snapshot may not be in our
-                // transaction log, so a snapshot is required.
+            } else if (lastSyncWithLeaderError || lastSyncWithLeader > peerLastZxid) {
+                // We have received a snapshot or diff from another leader containing updates which
+                // the follower is missing. These transactions are not in the committedLog
+                // or txnLog, so a snapshot is required.
                 LOG.info("Don't have required transactions to send diff for peer sid: " +
                           getSid() + ". Falling back to snapshot.");
             } else if ((maxCommittedLog >= peerLastZxid)

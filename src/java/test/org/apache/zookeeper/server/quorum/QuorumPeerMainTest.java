@@ -316,10 +316,8 @@ public class QuorumPeerMainTest extends QuorumPeerTestBase {
                 output[0], 2);
     }
 
-    @Test
-    public void testTransactionLogGap() throws Exception {
-        // Force snapshots temporarily so the test doesn't have to write a huge amount of data
-        System.setProperty("zookeeper.forceSnapshotSync", "true");
+    public void testTransactionLogGapInternal(boolean forceSnapshotSync) throws Exception {
+        System.setProperty("zookeeper.forceSnapshotSync", String.valueOf(forceSnapshotSync));
 
         // The transaction log preallocates a lot of space, and this test requires the leader to use a diff later.
         // Set snapshotSizeFactor ridiculously high to ensure a diff is preferred.
@@ -359,8 +357,7 @@ public class QuorumPeerMainTest extends QuorumPeerTestBase {
         servers.zk[2].getData(y, false, null);
 
         // Start server 4 back up.
-        // It will get a snapshot from the leader because forceSnapshotSync is turned on
-        // In a production scenario, this could be triggered by having enough transactions while 4 was down.
+        // It will get a snapshot from the leader if forceSnapshotSync is turned on
         servers.mt[4].start();
         servers.watchers[4].waitForConnected(ClientBase.CONNECTION_TIMEOUT);
 
@@ -404,6 +401,16 @@ public class QuorumPeerMainTest extends QuorumPeerTestBase {
                 }
             }
         }
+    }
+
+    @Test
+    public void testTransactionLogGapFromSnapshot() throws Exception {
+        testTransactionLogGapInternal(true);
+    }
+
+    @Test
+    public void testTransactionLogGapFromDiff() throws Exception {
+        testTransactionLogGapInternal(false);
     }
 
     private void waitForOne(ZooKeeper zk, States state) throws InterruptedException {
