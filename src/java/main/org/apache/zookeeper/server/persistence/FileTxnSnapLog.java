@@ -297,7 +297,7 @@ public class FileTxnSnapLog {
         LOG.info("Snapshotting: 0x{} to {}", Long.toHexString(lastZxid),
                 snapshotFile);
         snapLog.serialize(dataTree, sessionsWithTimeouts, snapshotFile);
-
+        LOG.info("Snapshot file size: " + snapshotFile.length());
     }
 
     /**
