@@ -57,7 +57,7 @@ public class FileSnap implements SnapShot {
     private static final long dbId=-1;
     private static final Logger LOG = LoggerFactory.getLogger(FileSnap.class);
     /** Set to true on Windows platforms */
-    public static final boolean WINDOWS /* borrowed from Path.WINDOWS */
+    public static final boolean WINDOWS
         = System.getProperty("os.name").startsWith("Windows");
     public final static int SNAP_MAGIC
         = ByteBuffer.wrap("ZKSN".getBytes()).getInt();
@@ -249,7 +249,7 @@ public class FileSnap implements SnapShot {
             // Additionally, ensure that the directory is synced as well.  Syncing a file does not
             // guarantee that the corresponding directory entry in its parent directory also gets
             // written to disk.  There is no way of ensuring this explicitly on Windows.
-            if (! WINDOWS) {
+            if (!WINDOWS) {
                 FileChannel directory = FileChannel.open(
                         snapShot.getParentFile().toPath(), StandardOpenOption.READ);
                 directory.force(true);
