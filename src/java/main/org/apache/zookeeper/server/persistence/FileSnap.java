@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +56,9 @@ public class FileSnap implements SnapShot {
     private static final int VERSION=2;
     private static final long dbId=-1;
     private static final Logger LOG = LoggerFactory.getLogger(FileSnap.class);
+    /** Set to true on Windows platforms */
+    public static final boolean WINDOWS
+        = System.getProperty("os.name").startsWith("Windows");
     public final static int SNAP_MAGIC
         = ByteBuffer.wrap("ZKSN".getBytes()).getInt();
     public FileSnap(File snapDir) {
@@ -222,7 +227,8 @@ public class FileSnap implements SnapShot {
     public synchronized void serialize(DataTree dt, Map<Long, Integer> sessions, File snapShot)
             throws IOException {
         if (!close) {
-            OutputStream sessOS = new BufferedOutputStream(new FileOutputStream(snapShot));
+            FileOutputStream fileOS = new FileOutputStream(snapShot);
+            OutputStream sessOS = new BufferedOutputStream(fileOS);
             CheckedOutputStream crcOut = new CheckedOutputStream(sessOS, new Adler32());
             //CheckedOutputStream cout = new CheckedOutputStream()
             OutputArchive oa = BinaryOutputArchive.getArchive(crcOut);
@@ -232,6 +238,23 @@ public class FileSnap implements SnapShot {
             oa.writeLong(val, "val");
             oa.writeString("/", "path");
             sessOS.flush();
+            // Sync the snapshot file to disk before returning.  This ensures that the snapshot
+            // is on disk before a subsequent sync of the log.  This is necessary for correctness
+            // because this snapshot file may contain some transactions which are not present in the
+            // log.  If the snapshot file is not fully written out, we will ignore it during
+            // recovery and may carry on to replay subsequent transactions from the log.  This
+            // gap of transactions may not get corrected in certain scenarios, which can cause
+            // data corruption.
+            fileOS.getFD().sync();
+            // Additionally, ensure that the directory is synced as well.  Syncing a file does not
+            // guarantee that the corresponding directory entry in its parent directory also gets
+            // written to disk.  There is no way of ensuring this explicitly on Windows.
+            if (!WINDOWS) {
+                FileChannel directory = FileChannel.open(
+                        snapShot.getParentFile().toPath(), StandardOpenOption.READ);
+                directory.force(true);
+                directory.close();
+            }
             crcOut.close();
             sessOS.close();
         }
