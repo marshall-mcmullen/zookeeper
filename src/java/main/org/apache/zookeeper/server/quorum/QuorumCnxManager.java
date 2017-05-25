@@ -28,7 +28,9 @@ import java.net.SocketException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.UnresolvedAddressException;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -448,10 +450,9 @@ public class QuorumCnxManager {
      */
     
     public void connectAll(){
-        long sid;
-        for(Enumeration<Long> en = getServers();
-            en.hasMoreElements();){
-            sid = en.nextElement();
+        List<Long> sids = Collections.list(getServers());
+        Collections.shuffle(sids);
+        for(long sid : sids) {
             connectOne(sid);
         }      
     }
