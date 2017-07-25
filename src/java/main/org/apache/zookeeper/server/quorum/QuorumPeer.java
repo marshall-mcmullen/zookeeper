@@ -432,11 +432,6 @@ public class QuorumPeer extends Thread implements QuorumStats.Provider {
     protected boolean quorumListenOnAllIPs = false;
 
     /**
-     * Timeout for connecting to new peers in milliseconds.
-     */
-    private int newPeerCnxTimeout = 5000;
-
-    /**
      * @deprecated As of release 3.4.0, this class has been deprecated, since
      * it is used with one of the udp-based versions of leader election, which
      * we are also deprecating.
@@ -584,11 +579,6 @@ public class QuorumPeer extends Thread implements QuorumStats.Provider {
     public QuorumPeer() {
         super("QuorumPeer");
         quorumStats = new QuorumStats(this);
-
-        String newPeerCnxTimeoutValue = System.getProperty("zookeeper.newPeerCnxTimeout");
-        if(newPeerCnxTimeoutValue != null){
-            this.newPeerCnxTimeout = new Integer(newPeerCnxTimeoutValue);
-        }
     }
 
 
@@ -1262,7 +1252,7 @@ public class QuorumPeer extends Thread implements QuorumStats.Provider {
            Map<Long, QuorumServer> committedView = getQuorumVerifier().getAllMembers();
            for (Entry<Long, QuorumServer> e: getLastSeenQuorumVerifier().getAllMembers().entrySet()){
                if (!committedView.containsKey(e.getKey())) 
-                   qcm.connectOne(e.getKey(), e.getValue().electionAddr, newPeerCnxTimeout);
+                   qcm.connectOne(e.getKey(), e.getValue().electionAddr);
            }
         }
     }
