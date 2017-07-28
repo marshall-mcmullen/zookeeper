@@ -249,9 +249,7 @@ public class Learner {
         int remainingInitLimitTime = initLimitTime;
         long startNanoTime = nanoTime();
 
-        final int sleepTime = 1000;
-        final int maxTries = initLimitTime / sleepTime;
-        for (int tries = 0; tries < maxTries; tries++) {
+        for (int tries = 0; tries < 5; tries++) {
             try {
                 // recalculate the init limit time because retries sleep for 1000 milliseconds
                 remainingInitLimitTime = initLimitTime - (int)((nanoTime() - startNanoTime) / 1000000);
@@ -266,12 +264,12 @@ public class Learner {
             } catch (IOException e) {
                 remainingInitLimitTime = initLimitTime - (int)((nanoTime() - startNanoTime) / 1000000);
 
-                if (remainingInitLimitTime <= sleepTime) {
+                if (remainingInitLimitTime <= 1000) {
                     LOG.error("Unexpected exception, initLimit exceeded. tries=" + tries +
                              ", remaining init limit=" + remainingInitLimitTime +
                              ", connecting to " + addr,e);
                     throw e;
-                } else if (tries >= maxTries - 1) {
+                } else if (tries >= 4) {
                     LOG.error("Unexpected exception, retries exceeded. tries=" + tries +
                              ", remaining init limit=" + remainingInitLimitTime +
                              ", connecting to " + addr,e);
@@ -284,7 +282,7 @@ public class Learner {
                     sock.setSoTimeout(self.tickTime * self.initLimit);
                 }
             }
-            Thread.sleep(sleepTime);
+            Thread.sleep(1000);
         }
         leaderIs = BinaryInputArchive.getArchive(new BufferedInputStream(
                 sock.getInputStream()));

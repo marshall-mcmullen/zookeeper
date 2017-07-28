@@ -28,9 +28,7 @@ import java.net.SocketException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.UnresolvedAddressException;
-import java.util.Collections;
 import java.util.Enumeration;
-import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -358,12 +356,11 @@ public class QuorumCnxManager {
     
     /**
      * Try to establish a connection to server with id sid using its electionAddr.
-     *
+     * 
      *  @param sid  server id
-     *  @param timeout connection timeout
      *  @return boolean success indication
      */
-    synchronized boolean connectOne(long sid, InetSocketAddress electionAddr, int timeout) {
+    synchronized boolean connectOne(long sid, InetSocketAddress electionAddr){
         if (senderWorkerMap.get(sid) != null) {
             LOG.debug("There is a connection already for server " + sid);
             return true;
@@ -375,7 +372,7 @@ public class QuorumCnxManager {
              }
              Socket sock = new Socket();
              setSockOpts(sock);
-             sock.connect(electionAddr, timeout);
+             sock.connect(electionAddr, cnxTO);
              if (LOG.isDebugEnabled()) {
                  LOG.debug("Connected to server " + sid);
              }
@@ -395,18 +392,8 @@ public class QuorumCnxManager {
                      e);
              return false;
          }
+   
     }
-
-    /**
-     * Try to establish a connection to server with id sid using its electionAddr.
-     *
-     *  @param sid  server id
-     *  @return boolean success indication
-     */
-    synchronized boolean connectOne(long sid, InetSocketAddress electionAddr){
-        return connectOne(sid, electionAddr, cnxTO);
-    }
-
     
     /**
      * Try to establish a connection to server with id sid.
@@ -450,9 +437,10 @@ public class QuorumCnxManager {
      */
     
     public void connectAll(){
-        List<Long> sids = Collections.list(getServers());
-        Collections.shuffle(sids);
-        for(long sid : sids) {
+        long sid;
+        for(Enumeration<Long> en = getServers();
+            en.hasMoreElements();){
+            sid = en.nextElement();
             connectOne(sid);
         }      
     }
