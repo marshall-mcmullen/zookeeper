@@ -721,7 +721,7 @@ public class LearnerHandler extends Thread {
                 currentZxid = maxCommittedLog;
                 needOpPacket = false;
                 needSnap = false;
-            } else if (lastSyncWithLeaderError || lastSyncWithLeader > peerLastZxid) {
+            } else if (lastSyncWithLeaderError || lastSyncWithLeader >= peerLastZxid) {
                 // We have received a snapshot or diff from another leader containing updates which
                 // the follower is missing. These transactions are not in the committedLog
                 // or txnLog, so a snapshot is required.
